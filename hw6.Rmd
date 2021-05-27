@@ -1,0 +1,93 @@
+---
+title: "Homework Six"
+author: "Chelsea Hughes"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, root.dir = "~/R")
+setwd("~/R")
+data <- read.delim("~/R/uscrime.txt")
+data2 <- data.frame(read.delim("~/R/uscrime.txt"))
+library(knitr)
+library(DAAG)
+library(boot)
+library(caret)
+```
+## Question 9.1
+**Using the same crime data set uscrime.txt as in Question 8.2, apply Principal Component Analysis and then create a regression model using the first few principal components. Specify your new model in terms of the original variables (not the principal components), and compare its quality to that of your solution to Question 8.2. You can use the R function prcomp for PCA. (Note that to first scale the data, you can include scale. = TRUE to scale as part of the PCA function. Don’t forget that, to make a prediction for the new city, you’ll need to unscale the coefficients (i.e., do the scaling calculation in reverse)!)**
+```{r pca, include = TRUE}
+
+#apply PCA 
+pca <- prcomp(data[,1:15], scale = TRUE)
+screeplot(pca, col = rainbow(10), type = "l")
+abline(h = 1, col = 400)
+ 
+#visualize principal components and variances
+summary(pca) 
+biplot(pca, expand = 1, cex = rep(par("cex"), 9)) 
+variance = pca$sdev ^ 2
+plot(variance, xlab = "Principal Component", ylab = "Proportion of Variance", ylim = c(0,1), type = "l")
+
+#build regression model
+pca2 <- cbind(pca$x[,1:10], data[,16])
+pca2 
+
+#summarize model using lm
+model <- lm(pca2[,11]~.,data=as.data.frame(pca2[, 1:10]))
+summary(model)
+
+#find coefficients and intercept, PC model 
+model$coefficients 
+coeff1 = as.matrix(model$coefficients[-1])
+coeff1
+coeff2 = as.matrix(model$coefficients[1])
+coeff2
+
+#find coefficients and intercept, original data 
+coeff3 = (pca$rotation[, 1:10] %*% coeff1)/pca$scale
+coeff4 = coeff2 - sum(coeff3 * pca$center)
+coeff5 = sum(coeff3, coeff4)
+
+#prepare: Y = aX + b
+data3 <- as.matrix(data[,1:15])
+estimate <- data3 * coeff5
+
+#RSquare and RSquare adjusted 
+SSE = sum((estimate - data[,16])^2)
+SStot = sum((data[,16] - mean(data[,16]))^2)
+R2 = 1 - SSE/SStot
+R2adj = R2 - (1-R2)*10/(nrow(data)-10-1)
+
+#set up new city
+newcity <- data.frame(M = 14.0,So = 0,Ed = 10.0,Po1 = 12.0,Po2 = 15.5,LF = 0.640,M.F = 94.0,Pop = 150,NW = 1.1,U1 = 0.120,U2 = 3.6,Wealth = 3200,Ineq = 20.1,Prob = 0.04,Time = 39.0)
+
+#predict new city 
+pred1 = coeff4 + sum(coeff3 * newcity)
+pred1
+
+```
+**Quality of solution for 8.2:**  
+*Multiple R^2: .803*  
+*Adjusted R^2: .707*  
+**Quality of solution for 9.1:**  
+*Multiple R^2: .654*     
+*Adjusted R^2: .608*   
+ 
+## Remarks  
+PCA seems like it wouldn't be the best choice as the values are much lower than last week's homework.  It's possible that this is due to overfitting although, I think I'd probably just use a non-pca model. In Homework five, my crime prediction was 1348 opposed to the lower 1110 for this week.
+
+I used the *Screeplot* function to add to the first plot. I probably only needed to test the first 4-6 PC's but when I only tested those, my values were much lower so following some trial and error, I landed on 10. [1]  
+
+I used a biplot to show the variances in the PC models. If we didn't have a Midterm this week, or once I get more comfortable with R, I'd like to explore resizing these plots so you can actually visualize the data better. I understand how to expand the variances to be more comparable in size and how to generally change the size of a plot; however, doing both gave me a run for my money. 
+
+Continuing my abovementioned thought, I think the better way (and more complex and time consuming) to approach this would have been looping to find R^2. I think that would be the most efficient way to find the most accurate PC model.  
+
+I found dealing with the coefficients to be quite problematic, in every sense of the word.[2]   
+
+## References 
+[1][Links]https://stat.ethz.ch/R-manual/R-patched/library/stats/html/screeplot.html  
+[2][Links]https://stats.stackexchange.com/questions/243508/failure-to-unscale-coefficients-from-a-linear-model-with-interactions  
+
+
+

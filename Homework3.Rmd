@@ -1,0 +1,155 @@
+---
+title: "Homework Three"
+author: "Chelsea Hughes"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("~/R")
+library(knitr)
+library(outliers)
+library(cusum)
+library(ggplot2)
+library(qcc)
+library(tseries)
+library(changepoint)
+data5 <- read.delim("~/R/uscrime.txt")
+data6 <- read.delim("~/R/temps.txt", header= TRUE, stringsAsFactors = FALSE)
+```
+
+## Question 5.1
+**Test to see whether there are any outliers in the last column (number of crimes per 100,000 people). Use the *grubbs.test* function in the outliers package in R.**
+```{r, include=TRUE}
+
+#visualize data 
+head(data5$Crime)
+length(data5$Crime)
+boxplot(data5$Crime, ylab="Year", xlab="Crime", col = 400)
+
+x = rnorm(30)
+
+#test for one outlier on one side 
+grubbs.test(x, type = 10, opposite = FALSE, two.sided = FALSE)
+
+#test for one outlier on opposite side 
+grubbs.test(x, type = 10, opposite = TRUE, two.sided = FALSE)
+
+#test for mutiple outliers on one side
+grubbs.test(x, type = 20, opposite = FALSE, two.sided = FALSE)
+
+#test for mutiple outliers on opposite side
+grubbs.test(x, type = 20, opposite = TRUE, two.sided = FALSE)
+
+#test for two outliers on opposite sides
+grubbs.test(x, type = 11, opposite = FALSE, two.sided = FALSE)
+
+#visualize outliers closer
+plot(data5$Crime,  ylab="Year", xlab="Crime", col = 300,  pch = 16)
+
+#test maximum outlier
+grubbs.test(data5$Crime)
+```
+*Even though I could plot and visualize where the outliers were that needed to be tested, I went ahead and generated tests assigning different parameters and types.  Of course, 1993 was the highest outlier.*
+There were other outliers, as seen in both plots; however, they are clustered in the left corner together.That doesn't exclude them from being outliers although it does stand to reason that there could be another pattern or reason to support the cluster. [1]  
+
+## Question 6.1
+**Describe a situation or problem from your job, everyday life, current events, etc., for which a Change Detection model would be appropriate. Applying the CUSUM technique, how would you choose the critical value and the threshold?**
+We've all heard that global warming has been significantly impacting the climate trends in particular areas of North America.  There has been correlation that this change is happening in areas where the population is also high; Colorado, California, and New England.. to name a few.  I plan on implementing this homework assignment into my personal life becaause, I now live in one of the affected areas (Boston) and have no idea what to expect to prepare for this upcoming winter.  Do I buy mutiple snow jackets from amazon or will some thick wool sweaters carry me through most of it? 
+*Calulating threshold:* I should calculate my threshold on the daily temperature from October 20 to May 1 every year over the last decade (which should be were we start to see the impact of global warming). 
+*Determining critical value:* From what I've heard, even with the changing climate - the winters are seemingly unpredictable and I wouldn't want this approach this with great amounts of sensitivity. I'd probably pick a pretty high threshold. I also wouldn't want there to be false positives that result in me freezing with my wool sweater selection.   
+
+## Question 6.2.a
+**Using July through October daily-high-temperature data for Atlanta for 1996 through 2015, use a CUSUM approach to identify when unofficial summer ends (i.e., when the weather starts cooling off) each year. You can get the data that you need from the file temps.txt or online. You can use R if you’d like, but it’s straightforward enough that an Excel spreadsheet can easily do the job too.**
+  
+```{r, include=TRUE}
+
+#visualize dataset
+summary(data6)
+
+#average daily temp
+dayavg <- rowMeans(data6[c(2:length(data6))], dims=1, na.rm=TRUE)
+dayavg
+
+#average daily temp across all time series
+tsavg <- mean(dayavg)
+tsavg
+
+#compute difference, set C and subtract
+mean1 <- dayavg - tsavg
+C <- 4
+mean2 <- mean1 - C
+
+#create vector to loop
+cusum1 <- 0 * mean2
+cusum2 <- append(cusum1, 0)
+
+#loop days
+for (i in 1:length(mean2)) 
+     
+#cusum and reindex
+{checker <- cusum2[i] + mean2[i]
+ifelse(checker > 0, cusum2[i+1] <- checker, cusum2[i+1] <- 0)}
+
+#plot model
+plot(cusum2, ylab = NULL, xlab = NULL, pch = 16, col = 300)
+
+#get index of max cusum
+which(cusum2 >= 83)
+
+#return date
+data6[54, 1]
+
+```
+*Summer ends approximately on August 23rd.*  
+I used this standard cusum formula: C[i] = max(0, C[i-1] + X[i] - k) after averaging the temparture of each day and then the average of those temparatures in each year. The daily average over the time series data is what I would consider my **threshold = 83.  C = 4** was picked seemingly randomly following some trial and error.  I had to change the C to be able to plot the graph.  When my C was six, the dot weren't even in a line, when my C was 5, all of the dots were in a straight line; so on and so forth. I used Ifelse which is specifically designed to work with (irregular) time series data.  [2][3]
+
+## Question 6.2.b
+**Use a CUSUM approach to make a judgment of whether Atlanta’s summer climate has gotten warmer in that time (and if so, when).**
+```{r, include=TRUE}
+
+#visualize dataset
+model1 = as.vector(unlist(data6[, 2:21]))
+model1 = ts( model1, start = 1996, frequency = 123 )
+plot.ts(model1, ylab="Temp", xlab="Year", col = 400)
+
+#average annual temp
+yearavg <- colMeans(data6[c(2:length(data6))], dims=1, na.rm=T)
+yearavg
+
+#average across all time series
+tsavg2 <- mean(yearavg)
+
+#compute difference, set C and subtract
+mean3 <- yearavg - tsavg2
+C <- 81
+mean4 <- yearavg - C
+
+#create vector to loop
+cusum3 <- 0 * mean4
+cusum4 <- append(cusum3, 0)
+
+#loop years
+for (i in 1:length(mean4)) 
+     
+#use cusum and reindex
+{checker <- cusum4[i] + mean4[i]
+ifelse(checker > 0, cusum4[i+1] <- checker, cusum4[i+1] <- 0)}
+
+#visualiaze cusum
+model2 = ts(mean4, start = 1996)
+plot.ts(model2, ylab="Cusum", xlab="Year", col = 400)
+```
+*Atlanta's summer climate has increased over time, it started to slightly become hotter in 2007 but hit it's higher change detection in 2010.*  
+I had the same logic and formula for both 3.2.a. but applied it by taking the cumulative sum of temparatures in each year and analyzing those to detect change between 1996 and 2015.  
+**I also completed this question in Excel, please refer to the Excel document attached in my homework.**  
+First, I imported the *dataset*.  Secondly, I created a copy table, labeled the Threshold and C as conssitent with the information in the R document.  I then found Mu and the standard deviation and applied the Cusum approach to each.  For your convenience, I attached the cusum chart below.  I have other visualizations avaiable in the Excel spreadsheet as I have a page explaining the craft of this cusum chart. [4]
+
+[INSERT CUSUM FROM EXCEL]
+
+## References
+[1][Links]https://cran.r-project.org/web/packages/outliers/outliers.pdf
+[2][Links]https://cran.r-project.org/web/packages/cusum/cusum.pdf
+[3][Links]https://www.spcforexcel.com/knowledge/variable-control-charts/keeping-process-target-cusum-charts#data  
+[4][Links]https://www.qimacros.com/  
+

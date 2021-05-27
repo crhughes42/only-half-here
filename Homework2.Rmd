@@ -1,0 +1,171 @@
+---
+title: "Homework 2"
+name: "Chelsea Hughes" 
+output: word_document
+--- 
+ 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r homework setup, include=FALSE}
+setwd("~/R")
+library(kknn)
+library(kernlab) 
+library(knitr)
+library(caret)
+library(KODAMA)
+library(e1071)
+library(factoextra)
+data1 <- read.delim("~/R/data_3.1/credit_card_data-headers.txt")
+```
+
+## Question 3.1
+**Use the ksvm or kknn function to find a good classifier:
+(a) using cross-validation (do this for the k-nearest-neighbors model; SVM is optional); and
+(b) splitting the data into training, validation, and test data sets (pick either KNN or SVM; the other
+is optional).**
+
+I will try both KNN and SVM models for classification, splitting data and cross-validation.  
+
+# KNN Model, 3.1.a. Cross Validation
+```{r}
+set.seed(40) 
+
+#assign data rows
+row1 = nrow(data1) 
+
+#assign random selection
+sample1 = sample(1:row1, size = round(row1/3), replace = FALSE)
+               
+#train data
+train1 = data1[-sample1,]
+
+#test data
+test1 = data1[sample1,]  
+
+#find the optimal value of k
+cv1=train.kknn(formula = R1 ~ ., data = train1, kmax = 100, kernel = c("optimal","rectangular", "inv", "gaussian", "triangular"), scale = TRUE) 
+cv1
+
+#perform 10-fold cross validation 
+model1 <- cv.kknn(formula = R1 ~., data1, kcv = 10, k = 24, scale = TRUE) 
+
+#get fitted values 
+pred1 <- model1[[1]][,2]
+pred1
+
+#Compare your test values 
+compare <-table(pred1,data1$R1) 
+compare
+
+#calculate accuracy 
+acc1 <- sum(pred1,data1$R1)/nrow(data1)
+acc1
+```
+*I wanted to explore other kernel options since part of this chunk was completed in the first homework assignment.  I ended up with an optimal K of 24 and an accuracy of 89%.* 
+
+# KNN Model, 3.1.b.Splitting Data 
+```{r knnsplittingdata, include=TRUE}
+
+#splitting data
+knn.split <- sample(3, nrow(data1), replace = TRUE, prob = c(1.4/3,1.2/3,.4/3))
+train2 <- data1[knn.split == 1,1:11]
+valid1 <- data1[knn.split == 2,1:11]
+test2 <- data1[knn.split == 3,1:11]
+model3 <- kknn(formula = R1 ~., train2, valid1, k = 24, scale = TRUE)
+model3 
+
+#round and predict
+pred2 <- round(fitted(model3)) == valid1$R1
+pred2
+
+#calculate accuracy 
+acc2 <- sum(pred2,data1$R1)/nrow(data1) 
+acc2
+
+```
+*I split my data with what gave me the highest accuracy after numerous attempts.  From best to worst, I tried: 47:40:13; 53:34:13; 66:21:13.* 
+
+# SVM Model, 3.1.a. Cross Validation
+```{r svmclassification, include=TRUE}
+
+#call Ksvm. 
+model2 <- ksvm(as.matrix(data1[,1:10]),as.factor(data1[,11]),type="C-svc",kernel="vanilladot",C=12,scaled=TRUE) 
+
+#see what the model predicts 
+pred2 <- predict(model2,data1[,1:10]) 
+pred2
+
+#see what fraction the model predicts and match actual classification 
+sum(pred2 == data1[,11]) / nrow(data1)
+
+#cross validation, 10 fold using Caret package
+cv2 <- trainControl(method = "repeatedcv", repeats = 10)
+
+```
+
+```
+*It's not complete but I attempted to cross validate with SVM using K = 12 and a 10 fold validation.  It sort of worked for 3.1.a, not so much for 3.1.b. I attemped to split the data 50:30:20 for 3.1.b but I couldn't figure out the error message.* [1]
+
+## Question 4.1  
+**Describe a situation or problem from your job, everyday life, current events, etc., for which a clustering
+model would be appropriate. List some (up to 5) predictors that you might use.**  
+
+Clustering, in my occupation, would be most prevalent for data investigation.  Within the Criminal Justice system, determining the causations of criminal behavior are the best way we have to determine what preventative measures could be implement to decrease crime.  We would label the *clusters* different types of crime.  *For this example, let us say: battery, assault and murder.*  
+
+**Predictors:** 
+Collateral damage
+Domestic
+Gang-related
+Intoxication
+Oppurtunity
+
+## Question 4.2  
+**The iris data set iris.txt contains 150 data points, each with four predictor variables and one
+categorical response. The predictors are the width and length of the sepal and petal of flowers and the
+response is the type of flower. The response values are only given to see how well a
+specific method performed and should not be used to build the model.
+Use the R function kmeans to cluster the points as well as possible. Report the best combination of
+predictors, your suggested value of k, and how well your best clustering predicts flower type.**  
+
+I'm going to explore the data before beginning the Clustering process, as I have found visualizing the data makes it easier to logically reason with clustering (and potential outliers). [2]
+
+# Clustering
+```{r visualizing, include=TRUE}
+
+#explore data
+library(datasets)
+
+head(iris)
+
+library(ggplot2)
+ggplot(iris, aes(Petal.Length, Petal.Width, color = Species)) + geom_point()
+ggplot
+```
+
+```{r clustering, include=TRUE}
+
+#make random assignments
+cluster1 <- kmeans(iris[, 3:4], centers = 2, nstart = 20)
+cluster1
+
+#compare clusters with species 
+table(cluster1$cluster, iris$Species)
+
+#plot clusters 
+cluster1$cluster <- as.factor(cluster1$cluster) 
+ggplot(iris, aes(Petal.Length, Petal.Width, color = iris$cluster)) + geom_point()
+
+```
+*best combination of predictors:*  Versicolor = cluster 1;Setosa = cluster 2; virginica = cluster 3; allows for: 89.3% accuracy.
+*suggested K Value:* 3 (elbow graph)
+
+Because Iris is embedded in R, and for the sake of practice, I decided to practice with other packages below.  
+
+## References 
+[1][Links]https://rpubs.com/markloessi/506713
+[2][Links]https://www.statmethods.net/advstats/cluster.html
+[3][Links]https://stats.stackexchange.com/questions/318968/knn-and-k-folding-in-r
+[4][Links]https://rdrr.io/cran/KODAMA/f/vignettes/KODAMA.Rmd
+[5][Links]https://www.pnas.org/content/111/14/5117 

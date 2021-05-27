@@ -1,0 +1,167 @@
+---
+title: "Homework Seven"
+author: "Chelsea Hughes"
+output: word_document
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+data1 <- read.delim("~/R/uscrime.txt")
+data7 <- read.table("~/R/germancredit.txt")
+library(knitr)
+library(boot)
+library(randomForest)
+library(rpart)
+library(tree)
+library(pROC)
+```
+
+## Question 10.1 
+**Using the same crime data set uscrime.txt as in Questions 8.2 and 9.1, find the best model you can using (a) a regression tree model, and (b) a random forest model. In R, you can use the tree package or the rpart package, and the randomForest package. For each model, describe one or two qualitative takeaways you get from analyzing the results (i.e., don’t just stop when you have a good model, but interpret it too).**
+
+# Regression Tree Model
+```{r regression tree model, include=TRUE}
+
+#use tree package 
+tree1 <- tree(Crime~., data1)
+summary(tree1)
+
+#visualize tree 
+plot(tree1, col = "olivedrab4")
+text(tree1)
+
+#get prediction
+pred1 <- predict(tree1)
+pred1
+crim <- data1$Crime
+
+#calculate R2 
+xr2 <- function(pred1, crim){
+sse1 <- sum(pred1 - crim)^2 
+sst1 <- sum(crim - mean(crim)^2) 
+r2 <- 1 - sse1/sst1
+r2}
+
+#prune tree 
+print(tree1$frame) 
+plot(prune.tree(tree1)$size, prune.tree(tree1)$dev, col = "tomato4")
+
+#cross validate 
+cv1 <- cv.tree(tree1)
+cv1$size 
+cv1$dev
+
+#visualize pruned tree
+tree2 <- prune.tree(tree1, best = 4)
+summary(tree2) 
+prune1 <- predict(tree2) 
+xr2(prune1, crim)
+plot(tree2, col = "steelblue4")
+text(tree2)
+
+```
+*Qualitative takeaways: Po1 is what we will use in 10.1.b because it is the primary factor. It looks like Po1<7.65 should be able to have a regression model built from it.*  
+
+# Random Forest Model 
+```{r random forest model, include=TRUE}
+
+#start regression with left leaf
+leaf1 <- data1[data1$Pol <7.65,]
+
+#randomForest package 
+rf1 <- 1 +log(ncol(data1))
+model2 <- randomForest(Crime~., data = data1, mtry = rf1)
+model2
+plot(model2, col = "darkblue")
+
+#get prediction
+pred2 <- predict(model2)
+
+#calculate R2 
+xr3 <- function(pred2, crim){
+sse2 <- sum(pred2 - crim)^2 
+r22 <- 1 - sse2/sst1
+r22}
+
+#visualize important features
+importance(model2) 
+varImpPlot(model2, col = "darkcyan")
+
+```
+*Qualitative takeaways: The Random Forest gives a prdictive value for Po1<7.65 with 40% variability.* 
+ 
+## Question 10.2
+**Describe a situation or problem from your job, everyday life, current events, etc., for which a logistic regression model would be appropriate. List some (up to 5) predictors that you might use.**
+A logisitic regression model could be used the predict the probability of a pass or fail grade for myself on the upcoming midterm. With my predictors listed below, I could found a threshold to divide into yes(pass)/no(fail) values.  
+*Predictors:* Homework grades, ungraded lecture questions, memorization of definitions in class-provided glossary for modules 1 - 10, well organized preparation of handwritten notes allowed for midterm, and performance on sample quiz one.  
+
+## Question 10.3 
+**Using the GermanCredit data set germancredit.txt from http://archive.ics.uci.edu/ml/machine-learning-databases/statlog/german / (description at http://archive.ics.uci.edu/ml/datasets/Statlog+%28German+Credit+Data%29 ), use logistic regression to find a good predictive model for whether credit applicants are good credit risks or not. Show your model (factors used and their coefficients), the software output, and the quality of fit. You can use the glm function in R. To get a logistic regression (logit) model on data where the response is either zero or one, use family=binomial(link=”logit”) in your glm function call. 2. Because the model gives a result between 0 and 1, it requires setting a threshold probability to separate between “good” and “bad” answers. In this data set, they estimate that incorrectly identifying a bad customer as good, is 5 times worse than incorrectly classifying a good customer as bad. Determine a good threshold probability based on your model.**
+
+```{r logistic regression, include=TRUE}
+
+#visualize data 
+head(data7) 
+
+#convert to binary
+data7$V21[data7$V21 == 2] <- 0 
+
+#splitting data 
+split1 <- sample(1:nrow(data7), size = round(0.8*nrow(data7)))
+train1 <- data7[split1,]
+test1 <- data7[-split1,]
+
+#logistic regression: use all variables 
+lr1 <- glm(V21 ~., family = binomial(link ="logit"), train1)
+summary(lr1) 
+
+#logisitic regression: use lr1 significant variables 
+lr2 = glm(V21 ~ V1+V2+V3+V4+V5+V6+V7+V8+V9+V10+V12+V14+V16+V20,family=binomial(link = "logit"), train1)
+summary(lr2)
+
+#logisitic regression: use lr2 significant variables 
+lr3 = glm(V21 ~ V1+V2+V3+V4+V5+V6+V8+V9+V10+V14+V20,family=binomial(link = "logit"), train1)
+summary(lr3)
+
+#test regression
+lr4 <- predict(lr3, test1, type = "response") 
+lr4
+
+#find threshold
+lr5 <- as.integer(lr4 > 0.5)
+lr5
+
+#get accuracy
+acc1 <- table(lr5, test1$V21) 
+acc2 <- (acc1[1,1] + acc1[2,2]) / sum(acc1)
+acc2
+
+#ROC Curve 
+roc1 <- roc(test1$V21, lr5)
+plot(roc1, main="ROC Curve", col = "darkslategrey")
+roc1
+
+#recalculate threshold to avoid incorrectly identifying bad customer
+lr6 <- as.integer(lr4 > 0.2)
+lr6
+
+#get accuracy
+acc3 <- table(lr6, test1$V21) 
+acc4 <- (acc3[1,1] + acc3[2,2]) / sum(acc3)
+acc4
+
+#plot new ROC Curve 
+roc2 <- roc(test1$V21, lr6)
+plot(roc2, main="ROC Curve 2", col = "rosybrown4")
+roc2
+
+```
+*Determining threshold: The first threshold would have been what I stuck with without reading part two of the question. Because it would be 5 times as bad to misclassify a bad customer, it was imperative to fund a probability threshold that was more accurate that what was found originally. I logically deducted that my threshold needed to be smaller and with some trial and error, landed on .2.  If it weren't midterm week and I had more time on my hands, I thinking looping to find the most accurate would have been my preferred method.* 
+**Good: 1**  
+**Bad: 0**  
+
+## References 
+[1][links]
+[2][links]
+[3][links]

@@ -1,0 +1,84 @@
+---
+title: "Homework Four"
+author: "Chelsea Hughes"
+output: word_document
+---
+ 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, root.dir = "~/R")
+```
+
+```{r hwsetup, include=FALSE}
+setwd("~/R")
+library(knitr)
+library(cusum)
+library(ggplot2)
+library(qcc)
+library(tseries)
+library(changepoint)
+library(urca)
+library(forecast) 
+library(smooth)
+data1 <- read.delim("~/R/temps.txt", header= TRUE, stringsAsFactors = FALSE)
+```
+
+## Question 7.1
+**Describe a situation or problem from your job, everyday life, current events, etc., for which exponential smoothing would be appropriate. What data would you need? Would you expect the value of α (the first smoothing parameter) to be closer to 0 or 1, and why?**  
+My dog has been sick for the past few weeks. Following several vet visits, I started taking stool samples twice daily so the vet to monitor contents digested vs. food consumed. This will be done for 21 days to determine any intestinal or liver damage. I would want α to be as close to 0 as possible to reduce sensitivity in fluctuation since the overall cyclic effect is what I need to monitor. 0 would make this less random and easier to predict future trends/sickness which is important because if you have ever been a dog owner, you know that they may consume things without human knowledge.  
+
+## Question 7.2
+**Using the 20 years of daily high temperature data for Atlanta (July through October) from Question 6.2 (file temps.txt), build and use an exponential smoothing model to help make a judgment of whether the unofficial end of summer has gotten later over the 20 years. (Part of the point of this assignment is for you to think about how you might use exponential smoothing to answer this question. Feel free to combine it with other models if you’d like to. There’s certainly more than one reasonable approach.) Note: in R, you can use either HoltWinters (simpler to use) or the smooth package’s es function (harder to use, but more general). If you use es, the Holt-Winters model uses model=”AAM” in the function call (the first and second constants are used “A”dditively, and the third (seasonality) is used “M”ultiplicatively; the documentation doesn’t make that clear).**  
+
+# Holt Winters, R
+```{r holtwinters, include=TRUE}
+
+#create vector and visualize dataset
+head(data1)
+model1 = as.vector(unlist(data1[, 2:21]))
+model1 = ts(model1, start = 1996, frequency = 123)
+plot.ts(model1, ylab="Temp", xlab="Time", col = 300)
+
+#single exponential smoothing 
+es1 <- HoltWinters(model1, beta = FALSE, gamma = FALSE)
+es1
+
+#double exponential smoothing 
+es2 <- HoltWinters(model1, gamma = FALSE)
+es2
+
+#triple exponential smoothing: X_t = L_t + T_t + S_t
+es3 <- HoltWinters(model1, seasonal = 'additive')
+es3
+
+#triple exponential smoothing: X_t = L_tT_tS_t
+es4 <- HoltWinters(model1, seasonal = 'multiplicative')
+es4
+
+#put in matrix 
+matrix1 <- matrix(es4$fitted[,4],ncol=123)
+
+#plot with trend
+model2 = HoltWinters(model1, alpha = .61, gamma = .54)
+plot(model2, col.predicted = 300)
+
+#calculate sum of squared errors
+model2$SSE 
+
+#forecast for the next year
+forecast = predict(model2, n.ahead = 100, prediction.interval = TRUE)
+plot(forecast(model2, h = 365))
+
+#fit model 
+model3 = model2$fitted
+plot(model3, main = NULL)
+```
+I decided to use exponential smoothing to estimate present trends.  Regardless of single, double, triple, additive or multiplicative; *β = o* (there were no significant trends) indicating that the unofficial end of summer hasn't really fluctuated over the last two decades. It does appear with the forecasting that it would predict a slight decrease even though no trend is predicted.  I'm assuming that means I did something wrong somewhere or maybe my approach just wasn't what it should be for this particular situation.  The matrix was created to run the cusum on seasonal factors; however, I chose to confirm my answer by detecting change in the seasons.  [1] 
+
+# Cusum Confirmation, Excel 
+
+[INSERT CHANGE DETECTIONs FROM EXCEL]  
+
+Since I was confused on to what the answer is, I went ahead and applied the cusum approach in Excel to see if summer has gotten longer over the years or if there is no pattern to suggest that.  As suspected, there seems to be no consistent incline or decline in seasonal change with increasing years.  This was completed using the same approach from Homework three.  
+
+## References 
+[1][links]https://otexts.com/fpp2/holt-winters.html  

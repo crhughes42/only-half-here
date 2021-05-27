@@ -1,0 +1,92 @@
+---
+title: "Homework Nine"
+author: "Chelsea Hughes"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(FrF2)
+library(ggplot2)
+library(survival) 
+library(SurvRegCensCov)
+library(knitr)
+library(dplyr)
+```
+ 
+## Question 12.1
+**Describe a situation or problem from your job, everyday life, current events, etc., for which a design of experiments approach would be appropriate.** 
+Suppose you owned an Etsy store and needed to gather information on which pieces in your inventory were actually being viewed or added to someone's cart. Etsy keeps track of your items purchased; however, this information would be quite important for determining which products would be worth making more of and which products should be halted in production. This would benefict the owner in two ways: being more cost efficient with reducing unused or nonmoveable inventory and creating more space to advertise products that could have a higher likelihood of being sold. 
+
+## Question 12.2 
+**To determine the value of 10 different yes/no features to the market value of a house (large yard, solar roof, etc.), a real estate agent plans to survey 50 potential buyers, showing a fictitious house with different combinations of features. To reduce the survey size, the agent wants to show just 16 fictitious houses. Use R’s FrF2 function (in the FrF2 package) to find a fractional factorial design for this experiment: what set of features should each of the 16 fictitious houses have? Note: the output of FrF2 is “1” (include) or “-1” (don’t include) for each feature.** 
+```{r, include=TRUE}
+
+#set features
+features = c("large_fenced_yard", "solar_roof", "fireplace", "ensuite_master_bathroom", "eat_in_kitchen", "kitchen_island", "hardwood_floors", "walk_in_closet", "granite_countertops", "new_appliances")
+
+#fractional factorial design
+FrF2(16, factor.names = features)
+
+#visualize ficitious houses
+plot(FrF2(16, factor.names = features))
+```
+## Question 13.1 
+**For each of the following distributions, give an example of data that you would expect to follow this distribution (besides the examples already discussed in class).** 
+*a. Binomial: How many people passed or failed MidTerm 1.*  
+*b. Geometric: If I randomly email people on my Etsy email subscription list, what is the probability that I contact someone who visited my shop in the last 6 months?* [1][2]
+```{r, include=TRUE}
+
+#p = probabilitiy of success with visitors 
+p = 0.1
+
+#n = number of subscribers not visiting my site  
+n = 4
+
+#exact and simulate 
+dgeom(x = n, prob = p)
+mean(rgeom(n = 1000, prob = p) == 4)
+
+#visualize Geometric Distribution 
+data.frame(x = 0:10, prob = dgeom(x = 0:10, prob = p)) %>% 
+  mutate(Failures = ifelse(x == n, n, "other")) %>% 
+  ggplot(aes(x = factor(x), y = prob, fill = Failures)) + geom_col() + geom_text(aes(label = round(prob,2), y = prob + 0.01), position = position_dodge(0.9), size = 4, vjust = 0) + labs(title = "Probability of failures prior to first success", x = "Failures prior to first success (x)", y = "Probability") 
+```
+*c. Poisson: Number of people who wait to buy real Pine trees for Christmas until Christmas Eve.*   
+*d. Exponential: Time between people visiting Tree farms on Christmas Eve.*   
+*e. Weibull: Let's go back to my Etsy store. I could take a random sample of failures observed since the opening of my store to determine the likelihood of each product.* [3][4]  
+```{r}
+
+#probability density function 
+T = 100
+gamma = 1.5 
+alpha = 500
+dweibull(T, gamma, alpha)
+
+#cumulative distribution function 
+pweibull(T, gamma, alpha) 
+
+#generate random sample
+sample = rweibull(10, 1.5, 500)
+
+#Visualize Weibull probability plot
+p = ppoints(sort(sample), a=0.3)
+plot(sort(sample), -log(1-p), log="xy", type="o", col="coral",
+     xlab="Time",
+     main = "Q-Q Plot: Weibell Distribution")
+```
+
+## Question 13.2 
+**In this problem you, can simulate a simplified airport security system at a busy airport. Passengers arrive according to a Poisson distribution with λ1 = 5 per minute (i.e., mean interarrival rate 1 = 0.2 minutes) to the ID/boarding-pass check queue, where there are several servers who each have exponential service time with mean rate 2 = 0.75 minutes. [Hint: model them as one block that has more than one resource.] After that, the passengers are assigned to the shortest of the several personal-check queues, where they go through the personal scanner (time is uniformly distributed between 0.5 minutes and 1 minute). Use the Arena software (PC users) or Python with SimPy (PC or Mac users) to build a simulation of the system, and then vary the number of ID/boarding-pass checkers and personal-check queues to determine how many are needed to keep average wait times below 15 minutes. [If you’re using SimPy, or if you have access to a non-student version of Arena, you can use λ1 = 50 to simulate a busier airport.]**  
+  
+[INSERT ARENA SIMULATION]  
+
+## References 
+[1][links] https://www.rdocumentation.org/packages/stats/versions/3.6.1/topics/Geometric  
+[2][links] https://www.r-bloggers.com/using-r-for-introductory-statistics-the-geometric-distribution/   
+[3][links] https://www.rdocumentation.org/packages/stats/versions/3.6.1/topics/Weibull  
+[4][links] https://data.library.virginia.edu/understanding-q-q-plots/  
+

@@ -1,0 +1,165 @@
+---
+title: "Homework Five"
+author: "Chelsea Hughes"
+output:
+  html_document:
+    df_print: paged
+---
+ 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, root.dir = "~/R")
+setwd("~/R")
+library(knitr)
+library(DAAG)
+library(boot)
+library(caret)
+library(ggplot2)
+library(ggiraph)
+library(ggiraphExtra)
+```
+
+## Question 8.1
+**Describe a situation or problem from your job, everyday life, current events, etc., for which a linear regression model would be appropriate. List some (up to 5) predictors that you might use.**  
+Living in Boston, we just recently had our biggest protest and parade on climate day attempting to educate the public on the dangers of global warming. Suppose we used a linear regression model to forecast how much of Boston's city would exist in 100 years. Nasa collects and records data continually and many analysts have donated descriptive analysis to get us to the point we are today. [4] Which is that the global sea level has risen 8 inches since 1880. This is important to any city at sea level with the potential to erode. We would use the below listed predictors to estimate a response. 
+*Predictors:* seawater expansion measurements, amount of water melting from glaciers/ice sheets  
+[ insert graph ]
+
+## Question 8.2
+**Using crime data from http://www.statsci.org/data/general/uscrime.txt (file uscrime.txt, description at http://www.statsci.org/data/general/uscrime.html ), use regression (a useful R function is (lm or glm) to predict the observed crime rate in a city with the following data:**   
+  
+M = 14.0
+So = 0
+Ed = 10.0
+Po1 = 12.0
+Po2 = 15.5
+LF = 0.640
+M.F = 94.0
+Pop = 150
+NW = 1.1
+U1 = 0.120
+U2 = 3.6
+Wealth = 3200
+Ineq = 20.1
+Prob = 0.04
+Time = 39.0  
+  
+**Show your model (factors used and their coefficients), the software output, and the quality of fit.**
+
+```{r,include=TRUE}
+
+#import dataset
+data1 <- read.delim("~/R/uscrime.txt")
+
+#store data to predict 
+data2 <- data.frame(M = 14.0, So = 0, Ed = 10.0, Po1 = 12.0, Po2 = 15.5, LF = 0.640, M.F = 94.0, Pop = 150, NW = 1.1, U1 = 0.120, U2 = 3.6, Wealth = 3200, Ineq = 20.1, Prob = 0.04, Time = 39.0)
+
+#visualize dataset 
+head(data1)
+ggPoints(aes(x=Crime,y=Pop),data=data1,method="lm",interactive=TRUE)
+
+```
+
+
+# lm 
+```{r,include=TRUE}
+
+set.seed(60)
+
+#linear regression, using lm and all data
+model1 <- lm(Crime~., data = data1)
+summary(model1)
+pred1 <- predict(model1, data2)
+pred1
+
+#summarize new model, using significant data
+model2 <- lm(Crime ~  M + Ed + Po1 + U2 + Ineq + Prob, data = data1)
+summary(model2)
+pred2 <- predict(model2, data2)
+pred2
+
+#check for overfitting 
+range(data1$Crime)
+
+#feature selection/cross validation, repeatedcv
+subset1 <- c(1:15)
+control1 <- rfeControl(functions = lmFuncs, method = "repeatedcv", number = 15, repeats = 30, verbose = FALSE)
+profile1 <- rfe(data1[,-16], data1[,16], sizes = subset1, rfeControl = control1)
+profile1
+
+#predict features, repeated cv
+predictors(profile1)
+
+#fit and plot model, repeated cv
+profile1$fit
+trellis.par.set(caretTheme())
+plot(profile1, type = c("g", "o"), col = 300)
+
+#predict crime rate, repeated cv 
+pred3 <- predict(profile1, data2) 
+pred3
+
+#feature selection/cross validation, simple cv
+control2 <- rfeControl(functions = lmFuncs, number = 15, verbose = FALSE)
+profile2 <- rfe(data1[,-16], data1[,16], sizes = subset1, rfeControl = control2)
+profile2
+
+#predict features, simple cv
+predictors(profile2)
+
+#fit and plot model, simple cv
+profile2$fit
+trellis.par.set(caretTheme())
+plot(profile2, type = c("g", "o"), col = 400)
+
+#predict crime rate, simple cv 
+pred4 <- predict(profile2, data2) 
+pred4
+```
+I would not have chosen this model in a real life situation.  That was made apparent for me before the cross validation was performed.  The predicted 155 was especially troubling once the range gave me 342 suggesting overfitting. [1] This led to cross validation, I ended up using *recursive feature selection* with the Caret package and a 15 fold validation that repeated 30 times. [2] I also use a simple cross validation method since I was already using to Caret to confirm the accuracy of my results.  
+
+# glm 
+```{r,include=TRUE}
+
+#linear regression, using glm
+model2 <- glm(Crime~., data = data1,family="gaussian")
+summary(model2)
+pred4 <- predict(model2, data2)
+pred4
+
+#perform 10 fold cross validation, using all data
+glmcv1 <- cv.glm(data1,model2,K=10)
+
+#calculate sum of squared error
+sse1 <- sum((data1$Ccrime - mean(data1$Crime))^2)
+glmcv1$delta[1]*nrow(data1)/sse1
+
+#fit and model 
+model2$fitted
+plot(model2)
+
+#summarize new model, using significant data
+model4 <- glm(Crime ~ M + Ed + Po1 + U2 + Ineq + Prob, data=data1, family="gaussian")
+summary(model4)
+pred5 <- predict(model4, data2)
+pred5
+
+#perform 10 fold cross validation, using significant data
+glmcv2 <- cv.glm(data1,model4,K=10)
+
+#calculate sum of squared error
+glmcv2$delta[1]*nrow(data1)/sse1
+
+#fit and model 
+model4$fitted
+plot(model4)
+
+```
+I used the Boot package for *glm*.  I have to say, *glm* seemed significantly more simple - which I suppose makes sense since it is designed to be used more generally.  
+    
+I used the ggiraphExtra package for plotting in the beginning of the assignment.  Just as I wouldn't have used these models in real life, I obviously wouldn't use that graph to visualize my problem or potential solution.  After some googling, I realized that this is a very simple way to plot regression models so I figured I'd just get a jump start on playing with it. [3]
+
+## References
+[1][Links] https://machinelearningmastery.com/feature-selection-with-the-caret-r-package/  
+[2][Links]https://topepo.github.io/caret/recursive-feature-elimination.html  
+[3][Links]https://cran.r-project.org/web/packages/ggiraphExtra/vignettes/ggPredict.html  
+[4][Links]https://climate.nasa.gov/effects/  
